@@ -191,6 +191,7 @@ class YouTubeMonitor:
             "--write-info-json",  # メタデータも保存
             "--embed-metadata",  # メタデータを埋め込み
             "--concurrent-fragments", "4",  # 並列ダウンロード
+            "--cookies-from-browser", "firefox",  # ブラウザのクッキーを使用
             video_url
         ]
 
