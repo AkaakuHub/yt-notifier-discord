@@ -1,0 +1,19 @@
+data_dir = "./data"
+
+[youtube]
+api_key = "YOUR_YOUTUBE_DATA_API_KEY"
+channels = [
+  { id = "UC_x5XG1OV2P6uZZ5FSM9Ttw", name = "Google Developers" }
+]
+
+[discord]
+webhook_url = "https://discord.com/api/webhooks/..."
+username = "YouTube Notifier"
+
+[polling]
+default_interval_minutes = 60
+timezone = "Asia/Tokyo"
+auto_start = true
+windows = [
+  { start = "20:00", end = "23:00", interval_minutes = 5, days = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"] }
+]

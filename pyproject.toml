@@ -1,0 +1,38 @@
+[project]
+name = "yt-notifier-discord"
+version = "0.1.0"
+description = "YouTube channel polling notifier for Discord"
+authors = [{ name = "akaaku" }]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "httpx>=0.27.2,<0.29",
+  "pydantic>=2.9.0,<3.0",
+  "aiolimiter>=1.1.0,<2.0",
+  "fastapi>=0.120.0,<0.121",
+  "uvicorn[standard]>=0.38.0,<0.39",
+  "jinja2>=3.1.4,<4.0",
+  "yt-dlp>=2025.10.22,<2025.11",
+  "pytz>=2025.2",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.1.0"
+]
+
+[project.scripts]
+yt-notifier = "yt_notifier.__main__:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/yt_notifier"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.uv]
+dev-dependencies = ["pytest>=8.1.0"]
