@@ -225,17 +225,40 @@ class YouTubeMonitor:
         try:
             while True:
                 if self.should_poll_now():
+                    logger.info("ポーリングウィンドウ内です - 動画チェックを実行")
                     await self.check_videos()
 
-                # 次のチェックまで待機
-                interval = self.config["polling"]["default_interval_minutes"] * 60
-                logger.info(f"次のチェックは {interval // 60} 分後")
+                    # ウィンドウ内の間隔を取得
+                    interval = self.get_window_interval()
+                    logger.info(f"次のチェックは {interval // 60} 分後（ウィンドウ内）")
+                else:
+                    logger.info("ポーリングウィンドウ外です - 次のウィンドウまで待機")
+                    interval = self.config["polling"]["default_interval_minutes"] * 60
+                    logger.info(f"次のチェックは {interval // 60} 分後（ウィンドウ外）")
+
                 await asyncio.sleep(interval)
 
         except KeyboardInterrupt:
             logger.info("シャットダウンします...")
         finally:
             await self.client.aclose()
+
+    def get_window_interval(self) -> int:
+        """現在のウィンドウに応じた間隔を取得"""
+        tz = pytz.timezone(self.config["polling"]["timezone"])
+        now = datetime.now(tz)
+        weekday = now.strftime("%a").lower()
+
+        for window in self.config["polling"]["windows"]:
+            if weekday in window["days"]:
+                start_time = datetime.strptime(window["start"], "%H:%M").time()
+                end_time = datetime.strptime(window["end"], "%H:%M").time()
+                current_time = now.time()
+
+                if start_time <= current_time <= end_time:
+                    return window["interval_minutes"] * 60
+
+        return self.config["polling"]["default_interval_minutes"] * 60
 
     async def test_once(self):
         """テスト実行（一度だけチェック）"""

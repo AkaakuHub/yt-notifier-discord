@@ -5,6 +5,10 @@ api_key = "YOUR_YOUTUBE_DATA_API_KEY"
 channels = [
   { id = "UC_x5XG1OV2P6uZZ5FSM9Ttw", name = "Google Developers" }
 ]
+query = [
+  { uid = 1, value = "メンバーシップ限定" },
+  { uid = 2, value = "メンバーシップ限定" },
+]
 
 [discord]
 webhook_url = "https://discord.com/api/webhooks/..."
