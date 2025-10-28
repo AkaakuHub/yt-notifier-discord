@@ -13,6 +13,7 @@ query = [
 [discord]
 webhook_url = "https://discord.com/api/webhooks/..."
 username = "YouTube Notifier"
+server_url = "https://your-server-url.com"
 
 [polling]
 default_interval_minutes = 60

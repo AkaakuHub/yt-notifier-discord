@@ -11,6 +11,7 @@ import tomllib
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import quote
 
 import httpx
 import pytz
@@ -136,9 +137,17 @@ class YouTubeMonitor:
         webhook_url = self.config["discord"]["webhook_url"]
         username = self.config["discord"]["username"]
 
+        # URLを生成 - server_urlが設定されている場合は検索URLを使用
+        if "server_url" in self.config.get("discord", {}):
+            server_url = self.config["discord"]["server_url"].rstrip('/')
+            search_query = quote(video["title"])
+            video_url = f"{server_url}?search={search_query}"
+        else:
+            video_url = video["url"]
+
         embed = {
             "title": video["title"],
-            "url": video["url"],
+            "url": video_url,
             "color": 0x5865F2,  # Discord blue
             "timestamp": video["published_at"],
             "footer": {"text": f"Playlist: {playlist_name}"}
