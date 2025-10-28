@@ -56,7 +56,7 @@ class YouTubeMonitor:
     def load_watched_videos(self) -> dict:
         """既視聴動画を読み込み（メタデータ付き）"""
         if WATCHED_FILE.exists():
-            with open(WATCHED_FILE, 'r') as f:
+            with open(WATCHED_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
                 # 古い形式（単純なリスト）から新しい形式への移行
                 if isinstance(data, list):
@@ -68,7 +68,7 @@ class YouTubeMonitor:
     def save_watched_videos(self):
         """既視聴動画を保存（メタデータ付き）"""
         WATCHED_FILE.parent.mkdir(exist_ok=True)
-        with open(WATCHED_FILE, 'w') as f:
+        with open(WATCHED_FILE, 'w', encoding='utf-8') as f:
             json.dump(self.watched_videos, f, indent=2, ensure_ascii=False)
 
     async def fetch_playlist_videos(self, playlist_id: str, max_results: int = 50, page_token: Optional[str] = None) -> dict:
