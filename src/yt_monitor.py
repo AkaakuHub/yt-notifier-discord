@@ -298,6 +298,11 @@ class YouTubeMonitor:
         logger.info(f"設定: {len(self.config['youtube']['playlist_id'])} 個のプレイリストを監視")
 
         try:
+            # 起動時に1回だけ強制的に動画チェックを実行
+            logger.info("=== 起動時チェックを実行します ===")
+            await self.check_videos()
+            logger.info("=== 起動時チェック完了 ===")
+
             while True:
                 if self.should_poll_now():
                     logger.info("ポーリングウィンドウ内です - 動画チェックを実行")
