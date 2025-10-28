@@ -48,12 +48,12 @@ windows = [
 
 **テスト実行**（一度だけチェック）:
 ```bash
-uv run python src/yt_monitor.py --test
+uv run yt-notifier-discord --test
 ```
 
 **常時実行**（スケジュール監視）:
 ```bash
-uv run python src/yt_monitor.py
+uv run yt-notifier-discord
 ```
 
 ## 機能詳細

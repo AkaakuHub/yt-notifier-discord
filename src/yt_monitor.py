@@ -29,9 +29,24 @@ logger = logging.getLogger(__name__)
 
 class YouTubeMonitor:
     def __init__(self):
+        # 必要なディレクトリを作成
+        self.ensure_directories()
+
         self.config = self.load_config()
         self.watched_videos = self.load_watched_videos()
         self.client = httpx.AsyncClient(timeout=30.0)
+
+    def ensure_directories(self):
+        """必要なディレクトリを自動作成"""
+        directories = [
+            CONFIG_FILE.parent,      # config/
+            WATCHED_FILE.parent,      # data/
+            DOWNLOAD_DIR,             # data/downloads/
+        ]
+
+        for directory in directories:
+            directory.mkdir(parents=True, exist_ok=True)
+            logger.debug(f"ディレクトリを確認/作成: {directory}")
 
     def load_config(self) -> dict:
         """設定ファイルを読み込み"""
@@ -386,5 +401,10 @@ async def main():
         await monitor.run()
 
 
-if __name__ == "__main__":
+def cli_main():
+    """CLI用の同期エントリーポイント"""
     asyncio.run(main())
+
+
+if __name__ == "__main__":
+    cli_main()
