@@ -18,6 +18,7 @@ import pytz
 # 設定
 CONFIG_FILE = Path("config/settings.toml")
 WATCHED_FILE = Path("data/watched_videos.json")
+DOWNLOAD_DIR = Path("data/downloads")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -115,8 +116,8 @@ class YouTubeMonitor:
 
         return all_videos
 
-    async def send_discord_notification(self, video: dict, playlist_name: str):
-        """Discordに通知を送信"""
+    async def send_discord_notification(self, video: dict, playlist_name: str, max_retries: int = 3):
+        """Discordに通知を送信（レート制限対応）"""
         webhook_url = self.config["discord"]["webhook_url"]
         username = self.config["discord"]["username"]
 
@@ -142,12 +143,79 @@ class YouTubeMonitor:
             "embeds": [embed]
         }
 
+        for attempt in range(max_retries):
+            try:
+                response = await self.client.post(webhook_url, json=payload)
+
+                if response.status_code == 429:
+                    # レート制限時
+                    retry_after = int(response.headers.get('Retry-After', 60))
+                    logger.warning(f"Discordレート制限。{retry_after}秒待機します... (試行 {attempt + 1}/{max_retries})")
+                    await asyncio.sleep(retry_after)
+                    continue
+                elif response.status_code == 204:
+                    # 成功
+                    logger.info(f"Discord通知を送信: {video['title']}")
+                    return True
+                else:
+                    # その他エラー
+                    response.raise_for_status()
+
+            except httpx.HTTPStatusError as e:
+                logger.error(f"Discord通知失敗 (HTTP {e.response.status_code}): {e}")
+                if attempt == max_retries - 1:
+                    break
+                await asyncio.sleep(2 ** attempt)  # 指数バックオフ
+            except Exception as e:
+                logger.error(f"Discord通知失敗: {e}")
+                if attempt == max_retries - 1:
+                    break
+                await asyncio.sleep(2 ** attempt)
+
+        logger.error(f"Discord通知をあきらめました: {video['title']}")
+        return False
+
+    async def download_video_with_ytdlp(self, video_url: str, video_id: str) -> bool:
+        """yt-dlpを使用して動画をダウンロード"""
+        DOWNLOAD_DIR.mkdir(exist_ok=True)
+
+        # 出力テンプレート: data/downloads/video_id/video_id.mp4
+        output_template = str(DOWNLOAD_DIR / video_id / f"{video_id}.mp4")
+
+        cmd = [
+            "yt-dlp",
+            "--format", "best",
+            "--output", output_template,
+            "--no-playlist",  # プレイリスト全体をダウンロードしない
+            "--write-thumbnail",  # サムネイルも保存
+            "--write-info-json",  # メタデータも保存
+            "--embed-metadata",  # メタデータを埋め込み
+            "--concurrent-fragments", "4",  # 並列ダウンロード
+            video_url
+        ]
+
         try:
-            response = await self.client.post(webhook_url, json=payload)
-            response.raise_for_status()
-            logger.info(f"Discord通知を送信: {video['title']}")
+            logger.info(f"yt-dlpで動画ダウンロード開始: {video_id}")
+
+            # 非同期でサブプロセスを実行
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+
+            stdout, stderr = await process.communicate()
+
+            if process.returncode == 0:
+                logger.info(f"動画ダウンロード成功: {video_id}")
+                return True
+            else:
+                logger.error(f"動画ダウンロード失敗: {video_id}, エラー: {stderr}")
+                return False
+
         except Exception as e:
-            logger.error(f"Discord通知失敗: {e}")
+            logger.error(f"yt-dlp実行エラー ({video_id}): {e}")
+            return False
 
     def should_poll_now(self) -> bool:
         """現在ポーリングすべき時刻か判定"""
@@ -193,9 +261,14 @@ class YouTubeMonitor:
                 for video in videos:
                     if video["video_id"] not in self.watched_videos:
                         logger.info(f"新しい動画発見: {video['title']}")
-                        await self.send_discord_notification(video, playlist["name"])
 
-                        # メタデータ付きで保存
+                        # Discord通知送信
+                        notification_success = await self.send_discord_notification(video, playlist["name"])
+
+                        # yt-dlpで動画ダウンロード
+                        download_success = await self.download_video_with_ytdlp(video["url"], video["video_id"])
+
+                        # メタデータ付きで保存（ダウンロード状態を含む）
                         self.watched_videos[video["video_id"]] = {
                             "title": video["title"],
                             "description": video.get("description", ""),
@@ -204,7 +277,9 @@ class YouTubeMonitor:
                             "thumbnail_url": video.get("thumbnail_url", ""),
                             "channel_name": video.get("channel_name", ""),
                             "added_at": video["added_at"],
-                            "playlist_name": playlist["name"]
+                            "playlist_name": playlist["name"],
+                            "is_downloaded": download_success,
+                            "notification_sent": notification_success
                         }
                         total_new_videos += 1
 
