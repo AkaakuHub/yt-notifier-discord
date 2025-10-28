@@ -184,7 +184,7 @@ class YouTubeMonitor:
 
         cmd = [
             "yt-dlp",
-            "--format", "best",
+            "--format", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=webm]+bestaudio[ext=m4a]/bestvideo[ext=webm]+bestaudio[ext=webm]/best",
             "--output", output_template,
             "--no-playlist",  # プレイリスト全体をダウンロードしない
             "--write-thumbnail",  # サムネイルも保存
