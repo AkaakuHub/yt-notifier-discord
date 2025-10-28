@@ -242,13 +242,14 @@ class YouTubeMonitor:
         return False
 
     async def check_videos(self):
-        """新しい動画をチェック"""
+        """動画チェックとダウンロード処理"""
         logger.info("動画チェックを開始...")
 
         playlists = {p["uid"]: p for p in self.config["youtube"]["playlist_id"]}
         queries = {q["uid"]: q["value"] for q in self.config["youtube"]["query"]}
 
         total_new_videos = 0
+        total_download_attempts = 0
 
         for uid, playlist in playlists.items():
             query = queries.get(uid, "")
@@ -257,19 +258,23 @@ class YouTubeMonitor:
             try:
                 videos = await self.get_all_playlist_videos(playlist["id"], query)
 
-                # 新しい動画を探す
+                # 動画処理ループ
                 for video in videos:
-                    if video["video_id"] not in self.watched_videos:
+                    video_id = video["video_id"]
+
+                    if video_id not in self.watched_videos:
+                        # 新しい動画の場合
                         logger.info(f"新しい動画発見: {video['title']}")
 
                         # Discord通知送信
                         notification_success = await self.send_discord_notification(video, playlist["name"])
 
                         # yt-dlpで動画ダウンロード
-                        download_success = await self.download_video_with_ytdlp(video["url"], video["video_id"])
+                        download_success = await self.download_video_with_ytdlp(video["url"], video_id)
+                        total_download_attempts += 1
 
                         # メタデータ付きで保存（ダウンロード状態を含む）
-                        self.watched_videos[video["video_id"]] = {
+                        self.watched_videos[video_id] = {
                             "title": video["title"],
                             "description": video.get("description", ""),
                             "published_at": video["published_at"],
@@ -283,12 +288,35 @@ class YouTubeMonitor:
                         }
                         total_new_videos += 1
 
+                    else:
+                        # 既存動画の場合、ダウンロード状態をチェック
+                        watched_data = self.watched_videos[video_id]
+
+                        # 未ダウンロードの動画があればダウンロードを試みる
+                        if not watched_data.get("is_downloaded", False):
+                            logger.info(f"未ダウンロード動画のダウンロードを試行: {watched_data['title']}")
+
+                            download_success = await self.download_video_with_ytdlp(video["url"], video_id)
+                            total_download_attempts += 1
+
+                            # ダウンロード状態を更新
+                            if download_success:
+                                self.watched_videos[video_id]["is_downloaded"] = True
+                                logger.info(f"動画ダウンロード成功: {watched_data['title']}")
+                            else:
+                                logger.warning(f"動画ダウンロード失敗: {watched_data['title']}")
+
             except Exception as e:
                 logger.error(f"動画取得エラー ({playlist['name']}): {e}")
 
-        if total_new_videos > 0:
+        if total_new_videos > 0 or total_download_attempts > 0:
             self.save_watched_videos()
-            logger.info(f"合計 {total_new_videos} 件の新しい動画を通知しました")
+
+            if total_new_videos > 0:
+                logger.info(f"合計 {total_new_videos} 件の新しい動画を通知しました")
+
+            if total_download_attempts > 0:
+                logger.info(f"合計 {total_download_attempts} 件のダウンロード試行がありました")
         else:
             logger.info("新しい動画はありませんでした")
 
