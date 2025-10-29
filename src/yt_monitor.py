@@ -8,6 +8,7 @@ import json
 import asyncio
 import logging
 import tomllib
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -140,7 +141,12 @@ class YouTubeMonitor:
         # URLを生成 - server_urlが設定されている場合は検索URLを使用
         if "server_url" in self.config.get("discord", {}):
             server_url = self.config["discord"]["server_url"].rstrip('/')
-            search_query = quote(video["title"])
+            # 動画タイトルから【メンバーシップ限定動画】#XX部分のみを抽出
+            match = re.match(r'(【メンバーシップ限定動画】#\d+)', video["title"])
+            if match:
+                search_query = quote(match.group(1))
+            else:
+                search_query = quote(video["title"])
             video_url = f"{server_url}?search={search_query}"
         else:
             video_url = video["url"]
@@ -204,7 +210,6 @@ class YouTubeMonitor:
         DOWNLOAD_DIR.mkdir(exist_ok=True)
 
         # ファイル名に使用できない文字をサニタイズ
-        import re
         safe_title = re.sub(r'[<>:"/\\|?*]', '_', video_title).strip()
 
         # 出力テンプレート: data/downloads/タイトル/タイトル.mp4
