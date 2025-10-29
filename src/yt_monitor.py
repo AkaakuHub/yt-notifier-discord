@@ -199,18 +199,23 @@ class YouTubeMonitor:
         logger.error(f"Discord通知をあきらめました: {video['title']}")
         return False
 
-    async def download_video_with_ytdlp(self, video_url: str, video_id: str) -> bool:
+    async def download_video_with_ytdlp(self, video_url: str, video_id: str, video_title: str) -> bool:
         """yt-dlpを使用して動画をダウンロード"""
         DOWNLOAD_DIR.mkdir(exist_ok=True)
 
-        # 出力テンプレート: data/downloads/video_id/video_id.mp4
-        output_template = str(DOWNLOAD_DIR / video_id / f"{video_id}.mp4")
+        # ファイル名に使用できない文字をサニタイズ
+        import re
+        safe_title = re.sub(r'[<>:"/\\|?*]', '_', video_title).strip()
+
+        # 出力テンプレート: data/downloads/タイトル/タイトル.mp4
+        output_template = str(DOWNLOAD_DIR / safe_title / f"{safe_title}.mp4")
 
         cmd = [
             "yt-dlp",
             "-f", "bestvideo[ext=mp4]+bestaudio[ext=m4a]/bestvideo[ext=webm]+bestaudio[ext=m4a]/bestvideo[ext=webm]+bestaudio[ext=webm]/best",
             "--output", output_template,
             "--no-playlist",  # プレイリスト全体をダウンロードしない
+            "--no-mtime",  # ファイルのタイムスタンプを変更しない
             "--write-thumbnail",  # サムネイルも保存
             "--write-info-json",  # メタデータも保存
             "--embed-metadata",  # メタデータを埋め込み
@@ -220,7 +225,7 @@ class YouTubeMonitor:
         ]
 
         try:
-            logger.info(f"yt-dlpで動画ダウンロード開始: {video_id}")
+            logger.info(f"yt-dlpで動画ダウンロード開始: {video_title}")
 
             # 非同期でサブプロセスを実行
             process = await asyncio.create_subprocess_exec(
@@ -232,14 +237,14 @@ class YouTubeMonitor:
             stdout, stderr = await process.communicate()
 
             if process.returncode == 0:
-                logger.info(f"動画ダウンロード成功: {video_id}")
+                logger.info(f"動画ダウンロード成功: {video_title}")
                 return True
             else:
-                logger.error(f"動画ダウンロード失敗: {video_id}, エラー: {stderr}")
+                logger.error(f"動画ダウンロード失敗: {video_title}, エラー: {stderr}")
                 return False
 
         except Exception as e:
-            logger.error(f"yt-dlp実行エラー ({video_id}): {e}")
+            logger.error(f"yt-dlp実行エラー ({video_title}): {e}")
             return False
 
     def should_poll_now(self) -> bool:
@@ -295,7 +300,7 @@ class YouTubeMonitor:
                         notification_success = await self.send_discord_notification(video, playlist["name"])
 
                         # yt-dlpで動画ダウンロード
-                        download_success = await self.download_video_with_ytdlp(video["url"], video_id)
+                        download_success = await self.download_video_with_ytdlp(video["url"], video_id, video["title"])
                         total_download_attempts += 1
 
                         # メタデータ付きで保存（ダウンロード状態を含む）
@@ -321,7 +326,7 @@ class YouTubeMonitor:
                         if not watched_data.get("is_downloaded", False):
                             logger.info(f"未ダウンロード動画のダウンロードを試行: {watched_data['title']}")
 
-                            download_success = await self.download_video_with_ytdlp(video["url"], video_id)
+                            download_success = await self.download_video_with_ytdlp(video["url"], video_id, video["title"])
                             total_download_attempts += 1
 
                             # ダウンロード状態を更新
