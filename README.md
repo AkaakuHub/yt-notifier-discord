@@ -51,10 +51,21 @@ windows = [
 uv run yt-notifier-discord --test
 ```
 
+**既存動画のDiscord通知**（古いものから順番に送信）:
+```bash
+uv run yt-notifier-discord --discord
+```
+
 **常時実行**（スケジュール監視）:
 ```bash
 uv run yt-notifier-discord
 ```
+
+### コマンドラインオプション
+
+- `--test`: テスト実行。一度だけ動画チェックを行い、新着動画があればDiscord通知とダウンロードを実行
+- `--discord`: 既存動画のDiscord通知。メタデータにある既存動画を投稿日順（古いものから）にソートし、順番にDiscordに通知
+- 引数なし: 常時実行モード。設定したスケジュールに従って定期的に動画監視
 
 ## 機能詳細
 

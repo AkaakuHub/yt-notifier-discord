@@ -409,13 +409,65 @@ class YouTubeMonitor:
         await self.check_videos()
         await self.client.aclose()
 
+    async def send_discord_for_existing_videos(self):
+        """既存の動画を投稿日順に古いものからDiscord通知"""
+        logger.info("既存動画のDiscord通知を開始します...")
+
+        # 既視聴動画メタデータがあるか確認
+        if not self.watched_videos:
+            logger.info("既視聴動画のメタデータがありません。先に動画チェックを実行してください。")
+            return
+
+        # published_atでソート（古いものから）
+        videos_by_date = sorted(
+            self.watched_videos.items(),
+            key=lambda x: x[1].get("published_at", "")
+        )
+
+        logger.info(f"{len(videos_by_date)}件の既存動画を処理します")
+
+        success_count = 0
+        total_count = len(videos_by_date)
+
+        for i, (video_id, video_data) in enumerate(videos_by_date, 1):
+            # 既存のメタデータをvideo_idを追加して使用
+            video_data["video_id"] = video_id
+            playlist_name = video_data.get("playlist_name", "Unknown Playlist")
+
+            logger.info(f"[{i}/{total_count}] Discord通知送信中: {video_data['title']}")
+
+            # Discord通知を送信
+            notification_success = await self.send_discord_notification(video_data, playlist_name)
+
+            if notification_success:
+                success_count += 1
+                logger.info(f"✅ Discord通知成功: {video_data['title']}")
+            else:
+                logger.error(f"❌ Discord通知失敗: {video_data['title']}")
+
+            # APIレート制限を避けるために少し待機
+            if i < total_count:  # 最後の動画以外は待機
+                await asyncio.sleep(2)  # 2秒待機
+
+        logger.info(f"Discord通知完了: {success_count}/{total_count}件の通知に成功しました")
+
 
 async def main():
     monitor = YouTubeMonitor()
 
     import sys
-    if len(sys.argv) > 1 and sys.argv[1] == "--test":
-        await monitor.test_once()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "--test":
+            await monitor.test_once()
+        elif sys.argv[1] == "--discord":
+            await monitor.send_discord_for_existing_videos()
+            await monitor.client.aclose()
+        else:
+            print(f"不明なオプション: {sys.argv[1]}")
+            print("使用方法: yt-notifier-discord [--test|--discord]")
+            print("  --test    : テスト実行（一度だけ動画チェック）")
+            print("  --discord : 既存動画を古いものから順番にDiscord通知")
+            await monitor.client.aclose()
     else:
         await monitor.run()
 
